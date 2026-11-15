@@ -685,6 +685,7 @@ export function ChatSidebar({
       <ModelReloadConfirm
         model={pendingReloadModel}
         notice={switchNotice}
+        profile={profile}
         onCancel={() => {
           const m = pendingReloadModel
           setPendingReloadModel(null)

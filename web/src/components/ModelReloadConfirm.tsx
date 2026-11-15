@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { reloadInManagedScope } from "@/lib/managed-scope-reload";
 
 /**
  * Confirm + full-page reload after a model change.
@@ -14,17 +15,24 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
  * identically. `model` is the short model name awaiting confirmation, or null
  * when the dialog is closed. `notice`: the backend's switch warning (Nous window
  * plans, Large model), shown under the body; absent for everyone else.
+ * `profile`: the management scope the pick was saved under. The reload carries
+ * it as an explicit `?profile=` (empty = this dashboard) so the page comes back
+ * in the same scope instead of the `--open-profile` bootstrap preselection
+ * (#146342). Omitted falls back to a plain reload for callers without a scope.
  */
 export function ModelReloadConfirm({
   model,
   description,
   notice,
+  profile,
   onCancel,
 }: {
   model: string | null;
   /** Override the default body copy (e.g. the Models-page phrasing). */
   description?: string;
   notice?: string | null;
+  /** Management scope the pick was saved under ("" = this dashboard). */
+  profile?: string;
   onCancel: () => void;
 }) {
   const body =
@@ -36,7 +44,11 @@ export function ModelReloadConfirm({
       title="Switch model?"
       description={notice ? `${body}\n\n⚠ ${notice}` : body}
       confirmLabel="Reload"
-      onConfirm={() => window.location.reload()}
+      onConfirm={() =>
+        profile === undefined
+          ? window.location.reload()
+          : reloadInManagedScope(profile)
+      }
       onCancel={onCancel}
     />
   );

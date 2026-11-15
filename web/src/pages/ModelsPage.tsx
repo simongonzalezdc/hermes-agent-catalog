@@ -39,6 +39,7 @@ import { Switch } from "@nous-research/ui/ui/components/switch";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { usePageHeader } from "@/contexts/usePageHeader";
+import { useProfileScope } from "@/contexts/useProfileScope";
 import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
@@ -958,6 +959,10 @@ function ModelSettingsPanel({
   refreshKey: number;
   onSaved(): void;
 }) {
+  // The write-target scope every api.setModelAssignment call here inherits
+  // (fetchJSON appends the mirrored management profile). The reload-confirm
+  // pins the same scope so the page comes back where the pick landed (#146342).
+  const { profile: scopeProfile } = useProfileScope();
   const [auxModalOpen, setAuxModalOpen] = useState(false);
   const [moaModalOpen, setMoaModalOpen] = useState(false);
   const [moa, setMoa] = useState<MoaConfigResponse | null>(null);
@@ -1128,6 +1133,7 @@ function ModelSettingsPanel({
         <ModelReloadConfirm
           model={pendingReloadModel}
           notice={switchNotice}
+          profile={scopeProfile}
           onCancel={() => setPendingReloadModel(null)}
         />
         {moaModalOpen && moa && (
