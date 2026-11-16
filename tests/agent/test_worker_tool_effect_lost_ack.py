@@ -97,6 +97,9 @@ def test_lost_ack_reconciles_tool_result_without_reexecuting_tool(
 
     state, db, scopes = receipt_owner
     scope = scopes[0]
+    # Real agent flushes also read compression lineage through worker receipts.
+    # Lose only the tool-result ACK; ancillary reads remain real and acknowledged.
+    state.delay_operation = "transcript.append"
     name, effect_path = effect_tool
     _fast_receipts(monkeypatch)
     store = RuntimeSessionStore(WorkerRPC(tmp_path), scope, tmp_path / "effect-outbox")
@@ -104,13 +107,15 @@ def test_lost_ack_reconciles_tool_result_without_reexecuting_tool(
         messages, failed = _execute_effect(store, db, scope, name)
         assert not failed
         assert effect_path.read_text(encoding="utf-8").splitlines() == ["executed"]
-        requests = state.requests
+        requests = [request for request in state.requests
+                    if request["params"]["operation"] == "transcript.append"]
         assert len(requests) == 2
         assert [request["method"] for request in requests] == ["worker.persist"] * 2
         # JSON-RPC correlation ids differ on reconnect; the durable operation is identical.
         assert requests[0]["params"] == requests[1]["params"]
         assert requests[0]["params"]["operation"] == "transcript.append"
-        assert state.retry_seen[(scope["execution_id"], 1)].is_set()
+        sequence = requests[0]["params"]["sequence"]
+        assert state.retry_seen[(scope["execution_id"], sequence)].is_set()
         rows = db.get_messages(scope["session_id"])
         assert len(rows) == 2  # one seeded assistant call plus one newly durable result
         results = [row for row in rows if row["role"] == "tool"]
@@ -119,7 +124,11 @@ def test_lost_ack_reconciles_tool_result_without_reexecuting_tool(
         assert json.loads(results[0]["content"]) == {"appended": True}
         assert len([row for row in messages if row["role"] == "tool"]) == 1
         with db._read_ctx() as conn:
-            assert conn.execute("SELECT COUNT(*) FROM worker_receipts").fetchone()[0] == 1
+            assert conn.execute(
+                "SELECT COUNT(*) FROM worker_receipts WHERE execution_id=? AND sequence=?",
+                (scope["execution_id"], sequence),
+            ).fetchone()[0] == 1
+            assert conn.execute("SELECT COUNT(*) FROM worker_receipts").fetchone()[0] == len(state.committed)
         assert store.journal["pending"] == []
         assert store.failure is None
     finally:
