@@ -1,0 +1,40 @@
+name: Receipt recovery contributor validation
+
+on:
+  push:
+    branches: [validation/149137-tool-effect-20261116]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: receipt-contributor-validation
+  cancel-in-progress: true
+
+jobs:
+  receipt-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout validation commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up locked test environment
+        uses: ./.github/actions/setup-pm
+        with:
+          extras: '["all", "anthropic"]'
+          test-environment: 'true'
+          cache: 'false'
+          cache-python: 'false'
+          cache-node: 'false'
+      - name: Run receipt and shutdown regressions
+        env:
+          HERMES_TEST_WORKERS: '2'
+          HERMES_TEST_FILE_RETRIES: '0'
+          HERMES_TEST_FILE_TIMEOUT: '180'
+          OPENAI_API_KEY: ''
+          OPENROUTER_API_KEY: ''
+          NOUS_API_KEY: ''
+        run: |
+          scripts/run_tests.sh tests/agent/test_worker_rpc_lost_ack_recovery.py tests/agent/test_worker_tool_effect_lost_ack.py tests/gateway/test_managed_worker_control_shutdown.py tests/gateway/test_managed_worker_rpc_close.py
