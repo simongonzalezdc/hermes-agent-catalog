@@ -1,4 +1,5 @@
 name: Receipt recovery contributor validation
+# Isolated push-triggered probe; never transferred to the upstream PR.
 
 on:
   push:
