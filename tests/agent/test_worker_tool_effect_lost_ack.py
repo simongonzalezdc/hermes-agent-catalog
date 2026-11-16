@@ -8,6 +8,7 @@ worker journal/RPC, WebSocket transport, and SQLite mutation remain in the path.
 """
 
 import json
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -69,6 +70,10 @@ def _execute_effect(store, db, scope, name):
         skip_context_files=True, skip_memory=True, skip_background_review=True,
         save_trajectories=False,
     )
+    # Start with a genuinely persisted recent activity heartbeat. Otherwise the
+    # executor emits an unrelated session.activity receipt before the result.
+    db.touch_session_activity(scope["session_id"])
+    agent._session_activity_last_persist_mono = time.monotonic()
     agent._session_db = store
     agent._session_db_created = True
     assistant = SimpleNamespace(tool_calls=[SimpleNamespace(
